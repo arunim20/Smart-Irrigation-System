@@ -4,32 +4,6 @@ This project is a complete real-time Smart Irrigation System designed using **ES
 
 ---
 
-## 📁 Project Structure
-
-SmartAgriProject/
-│
-├── simulation/ # Phase 1: Python simulation of sensor/environment data
-│ └── simulate_system.py
-│
-├── esp32_code/ # Phase 2-3: Embedded firmware for ESP32
-│ └── smart_agri.ino
-│
-├── dashboard/ # Phase 4: HTML + JS dashboard
-│ └── index.html
-│
-├── logger/ # Phase 5: Python MQTT data logger
-│ ├── mqtt_logger.py
-│ └── *.csv
-│
-├── docs/ # Phase 6: Reports, diagrams, and mapping
-│ ├── Design Report Smart Agri.pdf
-│ └── CircuitDiagram.png
-│
-└── README.md # This file
-
-
----
-
 ## 🎯 Objective
 
 Design and implement an embedded smart irrigation system that:
@@ -104,6 +78,26 @@ Design and implement an embedded smart irrigation system that:
 
 ---
 
+## 📌How to Run
+
+- ESP32 Setup
+  - Flash final.ino via Arduino IDE
+  - Connect DHT11 to digital pin (e.g. D4), Soil Sensor to analog pin (e.g. A0 or 34)
+
+- Python Logger
+  ```bash
+  cd logger
+  pip install paho-mqtt==1.6.1
+  python mqtt_logger.py
+
+- Web Dashboard
+  - Open dashboard/index.html in browser
+Ensure internet access (uses broker.emqx.io)
+
+
+
+---
+
 ## 📊 Sample JSON Payload
 
 ```json
@@ -117,20 +111,6 @@ Design and implement an embedded smart irrigation system that:
   "manual_mode": false
 }
 
-📌 How to Run
-1. ESP32 Setup
-Flash smart_agri.ino via Arduino IDE
 
-Connect DHT11 to digital pin (e.g. D4), Soil Sensor to analog pin (e.g. A0 or 34)
 
-2. Web Dashboard
-Open dashboard/index.html in browser
-
-Ensure internet access (uses broker.emqx.io)
-
-3. Python Logger
-```bash
-cd logger
-pip install paho-mqtt==1.6.1
-python mqtt_logger.py
 

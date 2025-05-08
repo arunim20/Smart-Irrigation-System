@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Smart Irrigation Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f8fb;
+      color: #333;
+      padding: 2rem;
+      margin: 0;
+    }
+    h1 {
+      text-align: center;
+    }
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: white;
+      padding: 1rem 2rem;
+      margin: 1rem;
+      border-radius: 1rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      min-width: 260px;
+      text-align: center;
+    }
+    canvas {
+      background: white;
+      padding: 1rem;
+      border-radius: 1rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin: 1rem auto;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 1rem;
+      border-radius: 8px;
+      border: none;
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #3e8e41;
+    }
+    .status {
+      text-align: center;
+      font-weight: bold;
+      margin-top: 1rem;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Smart Irrigation Dashboard</h1>
+
+  <div class="cards">
+    <div class="card"><h2>🌡️ Temperature</h2><div id="tempVal">-- °C</div></div>
+    <div class="card"><h2>💧 Humidity</h2><div id="humidVal">-- %</div></div>
+    <div class="card"><h2>🌱 Soil Moisture</h2><div id="moistureVal">-- %</div></div>
+    <div class="card"><h2>☀️ Evaporation</h2><div id="evapVal">-- mL</div></div>
+    <div class="card"><h2>🚿 Water Poured</h2><div id="waterVal">-- mL</div></div>
+    <div class="card"><h2>💡 Irrigation</h2><div id="irrigationVal">--</div></div>
+    <div class="card"><h2>📟 Status</h2><div id="statusVal">--</div></div>
+  </div>
+
+  <div class="status" id="mqttStatus">MQTT Status: Connecting...</div>
+  <div class="status" id="manualAlert" style="color:red; display:none;">
+    ⚠️ Manual Mode Activated – No water detected!
+  </div>
+
+  <div style="text-align: center;">
+    <button onclick="resumeIrrigation()">🔁 Resume Irrigation</button>
+  </div>
+
+  <canvas id="moistureChart" width="600" height="200"></canvas>
+  <canvas id="tempChart" width="600" height="200"></canvas>
+  <canvas id="humidChart" width="600" height="200"></canvas>
+  <canvas id="evapChart" width="600" height="200"></canvas>
+  <canvas id="waterChart" width="600" height="200"></canvas>
+  <canvas id="irrigationChart" width="600" height="200"></canvas>
+
+  <script>
+    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", { clientId: "dashboardClient_" + Math.random().toString(16).substr(2, 8) });
+    const MAX_POINTS = 25;
+    const moistureData = [], tempData = [], humidData = [], evapData = [], waterData = [], irrigationData = [], labels = [];
+    let lastUpdate = 0;
+
+    function createLineChart(ctx, label, color, data) {
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: data,
+            borderColor: color,
+            borderWidth: 2,
+            fill: false,
+            tension: 0.3
+          }]
+        }
+      });
+    }
+
+    const moistureChart = createLineChart(document.getElementById("moistureChart"), 'Soil Moisture (%)', 'green', moistureData);
+    const tempChart = createLineChart(document.getElementById("tempChart"), 'Temperature (°C)', 'red', tempData);
+    const humidChart = createLineChart(document.getElementById("humidChart"), 'Humidity (%)', 'blue', humidData);
+    const evapChart = createLineChart(document.getElementById("evapChart"), 'Evaporation (mL)', 'orange', evapData);
+    const waterChart = createLineChart(document.getElementById("waterChart"), 'Water Poured (mL)', 'purple', waterData);
+    const irrigationChart = createLineChart(document.getElementById("irrigationChart"), 'Irrigation (1=ON, 0=OFF)', 'gray', irrigationData);
+
+    client.on("connect", () => {
+      document.getElementById("mqttStatus").innerText = "MQTT Status: Connected";
+      client.subscribe("esp32/agri/data");
+    });
+
+    client.on("error", err => {
+      console.error("MQTT connection error:", err);
+      document.getElementById("mqttStatus").innerText = "MQTT Status: Error";
+    });
+
+    client.on("message", (_, message) => {
+      const now = Date.now();
+      if (now - lastUpdate < 500) return;
+      lastUpdate = now;
+      try {
+        const data = JSON.parse(message.toString());
+        const time = new Date().toLocaleTimeString();
+
+        document.getElementById("tempVal").innerText = data.temperature + " °C";
+        document.getElementById("humidVal").innerText = data.humidity + " %";
+        document.getElementById("moistureVal").innerText = data.soil_moisture + " %";
+        document.getElementById("evapVal").innerText = data.evaporation_ml + " mL";
+        document.getElementById("waterVal").innerText = data.water_poured + " mL";
+        document.getElementById("irrigationVal").innerText = data.irrigation ? "ON" : "OFF";
+        document.getElementById("statusVal").innerText = data.manual_mode ? "Manual" : (data.irrigation ? "Irrigating" : "Idle");
+        document.getElementById("manualAlert").style.display = data.manual_mode ? "block" : "none";
+
+        labels.push(time);
+        tempData.push(data.temperature);
+        humidData.push(data.humidity);
+        moistureData.push(data.soil_moisture);
+        evapData.push(data.evaporation_ml);
+        waterData.push(data.water_poured);
+        irrigationData.push(data.irrigation ? 1 : 0);
+
+        while (labels.length > MAX_POINTS) {
+          labels.shift(); tempData.shift(); humidData.shift(); moistureData.shift();
+          evapData.shift(); waterData.shift(); irrigationData.shift();
+        }
+
+        moistureChart.update();
+        tempChart.update();
+        humidChart.update();
+        evapChart.update();
+        waterChart.update();
+        irrigationChart.update();
+      } catch (e) {
+        console.error("Invalid message format", e);
+      }
+    });
+
+    function resumeIrrigation() {
+      client.publish("esp32/agri/command", "resume");
+      alert("Resume command sent!");
+    }
+  </script>
+</body>
+</html>
